@@ -13,6 +13,8 @@ type data struct {
 	Method string
 }
 
+var dataMap = make(map[int]data)
+
 type initSessionId struct{
 	Num int
 }
@@ -77,9 +79,18 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 		if err = socket.WriteJSON(initUser); err != nil {
 
-			log.Printf("Error while sending message to %d", usersCounter)
+			log.Printf("error: %v", err)
 			usersCounter -= 1
 			return 
+		}
+
+		//draw all already connected users
+		for _, val := range dataMap {
+			if err := socket.WriteJSON(val); err != nil {
+				log.Printf("error: %v", err)
+				usersCounter -= 1
+				return
+			}
 		}
 
 		//register new user
@@ -94,11 +105,14 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("error: %v", err)
 			delete(clients, socket)
+			delete(dataMap, currentUser)
 			//tell all other users to delete location of this user, when he close the page
 			broadcast <- data{0, 0, currentUser, "leave"}
 			break
 		}
-		broadcast <- data{coordinates.X, coordinates.Y, coordinates.SessionId, "move"}
+		dataTemp := data{coordinates.X, coordinates.Y, coordinates.SessionId, "move"}
+		dataMap[coordinates.SessionId] = dataTemp
+		broadcast <- dataTemp
 	}
 }
 
